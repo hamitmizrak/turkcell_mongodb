@@ -82,8 +82,8 @@ $ show dbs           ==> Bütün database listelesin
 $ db                 ==> Sadece çalıştığım database ismini verdim
 $ db.dropDatabase()  ==> Database sil
 $ db.stats()         ==> Database genel istatiksel yapısını bize gösterir.
-$ db.version()      ==> Bağlanılan MongoDB versiyonun ekran yazısn (8.0.13)
-$  db.getUsers()     ==> Database içindeki kullanıcıları bana versin
+$ db.version()       ==> Bağlanılan MongoDB versiyonun ekran yazısn (8.0.13)
+$ db.getUsers()      ==> Database içindeki kullanıcıları bana versin
 {
   users: [
     {
@@ -98,6 +98,18 @@ $  db.getUsers()     ==> Database içindeki kullanıcıları bana versin
   ok: 1
 }
 
+$  db.adminCommand({listDatabases:1})    ==> Veritabanaların detaylı bilgilendirimesi içindeki
+{
+  databases: [
+    { name: 'admin', sizeOnDisk: Long('135168'), empty: false },
+    { name: 'config', sizeOnDisk: Long('110592'), empty: false },
+    { name: 'local', sizeOnDisk: Long('73728'), empty: false },
+    { name: 'turkcell', sizeOnDisk: Long('16384'), empty: false }
+  ],
+  totalSize: Long('335872'),
+  totalSizeMb: Long('0'),
+  ok: 1
+}
 ```
 
 ---
