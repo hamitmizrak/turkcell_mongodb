@@ -83,6 +83,20 @@ $ db                 ==> Sadece çalıştığım database ismini verdim
 $ db.dropDatabase()  ==> Database sil
 $ db.stats()         ==> Database genel istatiksel yapısını bize gösterir.
 $ db.version()      ==> Bağlanılan MongoDB versiyonun ekran yazısn (8.0.13)
+$  db.getUsers()     ==> Database içindeki kullanıcıları bana versin
+{
+  users: [
+    {
+      _id: 'turkcell.hamit',
+      userId: UUID('afeba7c4-6b87-4944-be6a-2bec20a18a45'),
+      user: 'hamit',
+      db: 'turkcell',
+      roles: [ { role: 'dbOwner', db: 'turkcell' } ],
+      mechanisms: [ 'SCRAM-SHA-1', 'SCRAM-SHA-256' ]
+    }
+  ],
+  ok: 1
+}
 
 ```
 
