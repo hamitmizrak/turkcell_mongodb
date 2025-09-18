@@ -112,53 +112,7 @@ $ db.adminCommand({listDatabases:1})    ==> Veritabanların detaylı bilgilendir
 }
 
 $  db.getRoles({showBuiltinRoles:true})  ==> Sunucudaki tüm veri tabanı rollerin listesini
-{
-  roles: [
-    {
-      role: 'read',
-      db: 'turkcell',
-      isBuiltin: true,
-      roles: [],
-      inheritedRoles: []
-    },
-    {
-      role: 'dbOwner',
-      db: 'turkcell',
-      isBuiltin: true,
-      roles: [],
-      inheritedRoles: []
-    },
-    {
-      role: 'readWrite',
-      db: 'turkcell',
-      isBuiltin: true,
-      roles: [],
-      inheritedRoles: []
-    },
-    {
-      role: 'dbAdmin',
-      db: 'turkcell',
-      isBuiltin: true,
-      roles: [],
-      inheritedRoles: []
-    },
-    {
-      role: 'userAdmin',
-      db: 'turkcell',
-      isBuiltin: true,
-      roles: [],
-      inheritedRoles: []
-    },
-    {
-      role: 'enableSharding',
-      db: 'turkcell',
-      isBuiltin: true,
-      roles: [],
-      inheritedRoles: []
-    }
-  ],
-  ok: 1
-}
+
 
 $ db.getMongo()           ==> Veri tabanı Bağlantı Bilgisini Göster
 mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.5.8
