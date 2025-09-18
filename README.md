@@ -81,6 +81,7 @@ $ use turkcell
 $ show dbs           ==> Bütün database listelesin
 $ db                 ==> Sadece çalıştığım database ismini verdim
 $ db.dropDatabase()  ==> Database sil
+$ db.stats()         ==> Database genel istatiksel yapısını bize gösterir.
 
 ```
 
@@ -91,9 +92,11 @@ $ db.dropDatabase()  ==> Database sil
 ```bash
 $ mongosh
 $ use turkcell
-$ show collections ==> Bütün tabloları listelesin
 $ db.createCollection("blogcategory")
 $ db.createCollection("blog")
+$ show collections ==> Bütün tabloları listelesin
+$ db.getCollectionNames() ==> Koleksiyonların isimlerini bir dizi olarak ver
+
 
 ```
 
