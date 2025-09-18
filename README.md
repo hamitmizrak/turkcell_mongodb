@@ -72,3 +72,27 @@ $ mongosh --username hamit --password 123 --authenticationDatabase turkcell
 ```
 
 ---
+
+## Database Komutları
+
+```bash
+$ mongosh
+$ use turkcell
+$ show dbs           ==> Bütün database listelesin
+$ show db            ==> Sadece çalıştığım database ismini verdim
+$ db.dropDatabase()  ==> Database sil
+
+```
+
+---
+
+## Database Collections(Tablolar)
+
+```bash
+$ mongosh
+$ use turkcell
+$ show collections ==> Bütün tabloları listelesin
+
+```
+
+---
