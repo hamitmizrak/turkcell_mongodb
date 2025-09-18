@@ -180,10 +180,10 @@ $ mongosh
 $ use turkcell
 $ db.createCollection("blogcategory")
 $ db.createCollection("blog")
-$ show collections ==> Bütün tabloları listelesin
-$ db.getCollectionNames() ==> Koleksiyonların isimlerini bir dizi olarak ver
+$ show collections            ==> Bütün tabloları listelesin
+$ db.getCollectionNames()     ==> Koleksiyonların isimlerini bir dizi olarak ver
+$ db.blog.drop()              ==> Koleksiyonlar silmek
 
 
 ```
-
 ---
