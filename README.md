@@ -79,7 +79,7 @@ $ mongosh --username hamit --password 123 --authenticationDatabase turkcell
 $ mongosh
 $ use turkcell
 $ show dbs           ==> Bütün database listelesin
-$ show db            ==> Sadece çalıştığım database ismini verdim
+$ db                 ==> Sadece çalıştığım database ismini verdim
 $ db.dropDatabase()  ==> Database sil
 
 ```
@@ -92,6 +92,8 @@ $ db.dropDatabase()  ==> Database sil
 $ mongosh
 $ use turkcell
 $ show collections ==> Bütün tabloları listelesin
+$ db.createCollection("blogcategory")
+$ db.createCollection("blog")
 
 ```
 
