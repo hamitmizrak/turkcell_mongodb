@@ -13,9 +13,27 @@ git push -u origin master
 git clone https://github.com/hamitmizrak/turkcell_mongodb.git
 ```
 
-## mongod.cfg
+## Mongo version
 
 ```bash
+$ mongosh --help
+$ mongosh --version
+$ 
+$ net start mongoDB
+$ net stop mongodb
+$ net query mongodb
+$ 
+$ 
+$ 
+$ 
+$ 
+$ 
+$ 
+$ 
+$ 
+$ 
+$ 
+
 
 ```
 
