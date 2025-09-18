@@ -26,21 +26,20 @@ $
 $ mongosh
 $ mongosh --port 27017
 $
-$ netstat -aon | findstr :27017  
+$ netstat -aon | findstr :27017
 $ taskkill /PID PID_NUMBER /F
 
 ```
 
 ---
 
-
-## Database oluştur, Yetkilendirme
+## Database oluştur, Special Yetkilendirme
 
 ```bash
 
 $ mongosh
-$ use turkcell 
-$
+$ use turkcell
+$ Sadece turkcell databaseinde yetkilendirme verdim
 $ db.createUser({
   user: "hamit",
   pwd: "123",
@@ -51,4 +50,25 @@ $ db.getUsers()
 $ mongosh --username hamit --password 123 --authenticationDatabase turkcell
 
 ```
+
+---
+
+## Database oluştur, Tüm Yetkilendirme
+
+```bash
+
+$ mongosh
+$ use admin
+$ Tüm  databaseinde yetkilendirme verdim
+$ db.createUser({
+  user: "hamit",
+  pwd: "123",
+  roles:[{role:"root",db:"admin"}]
+})
+
+$ db.getUsers()
+$ mongosh --username hamit --password 123 --authenticationDatabase turkcell
+
+```
+
 ---
