@@ -34,9 +34,10 @@ $ taskkill /PID PID_NUMBER /F
 ---
 
 
-## Database Yetkilendirme
+## Database oluştur, Yetkilendirme
 
 ```bash
+
 $ mongosh
 $ use turkcell 
 $
@@ -47,6 +48,7 @@ $ db.createUser({
 })
 
 $ db.getUsers()
+$ mongosh --username hamit --password 123 --authenticationDatabase turkcell
 
 ```
 ---
