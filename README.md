@@ -159,6 +159,11 @@ $  db.getRoles({showBuiltinRoles:true})  ==> Sunucudaki tüm veri tabanı roller
   ],
   ok: 1
 }
+
+$ db.getMongo()      ==> Veri tabanı Bağlantı Bilgisini Göster
+mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.5.8
+
+
 ```
 
 ---
