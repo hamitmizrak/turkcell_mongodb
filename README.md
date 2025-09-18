@@ -82,6 +82,7 @@ $ show dbs           ==> Bütün database listelesin
 $ db                 ==> Sadece çalıştığım database ismini verdim
 $ db.dropDatabase()  ==> Database sil
 $ db.stats()         ==> Database genel istatiksel yapısını bize gösterir.
+$ db.version()      ==> Bağlanılan MongoDB versiyonun ekran yazısn (8.0.13)
 
 ```
 
