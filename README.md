@@ -160,11 +160,61 @@ $  db.getRoles({showBuiltinRoles:true})  ==> Sunucudaki tüm veri tabanı roller
   ok: 1
 }
 
-$ db.getMongo()      ==> Veri tabanı Bağlantı Bilgisini Göster
+$ db.getMongo()           ==> Veri tabanı Bağlantı Bilgisini Göster
 mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.5.8
 
 
-$  db.serverStatus()  ==> Sunucunu genel durumu, memory,disk, ve bir çok istatistiği
+$ db.serverStatus()       ==> Sunucunu genel durumu, memory,disk, ve bir çok istatistiği
+
+$ db.getCollectionInfos()  ==> Veritabanındaki tüm koleksiyonların isim ve tip bilgisin dönder
+[
+  {
+    name: 'blog',
+    type: 'collection',
+    options: {},
+    info: {
+      readOnly: false,
+      uuid: UUID('512848fa-174b-432c-96d8-f4094f14c588')
+    },
+    idIndex: { v: 2, key: { _id: 1 }, name: '_id_' }
+  },
+  {
+    name: 'blogcategory',
+    type: 'collection',
+    options: {},
+    info: {
+      readOnly: false,
+      uuid: UUID('bd0c700e-2ae5-416a-b774-08fd1fc5b06d')
+    },
+    idIndex: { v: 2, key: { _id: 1 }, name: '_id_' }
+  }
+]
+
+
+$ db.getSiblingDB("admin").system.users.find().pretty();  ==>  Tüm veri tabanlarındaki tüm kullancııların lsitesi(admin yetkisi ver)
+[
+  {
+    _id: 'turkcell.hamit',
+    userId: UUID('afeba7c4-6b87-4944-be6a-2bec20a18a45'),
+    user: 'hamit',
+    db: 'turkcell',
+    credentials: {
+      'SCRAM-SHA-1': {
+        iterationCount: 10000,
+        salt: 'n6VCcZNYx5ptTkQv566/yw==',
+        storedKey: 'VSDvupAOr/6lQoCCX44fGHdHqpI=',
+        serverKey: 'uK5Bhtjve6WXNqMrTff8+YDylQ8='
+      },
+      'SCRAM-SHA-256': {
+        iterationCount: 15000,
+        salt: 'PeR89jTrXMZpGhhWfMKDw+rxMRbeuKl+5fauUg==',
+        storedKey: 'HGPFqkMMXqatfmAEXVnarRXGk8MLaLA3R8RjaF7BgNs=',
+        serverKey: 'xVctIQQnBfLSpABT2Nq1AAdeYxzZGNu9I1BK42SF5sU='
+      }
+    },
+    roles: [ { role: 'dbOwner', db: 'turkcell' } ]
+  }
+]
 ```
 
 ---
