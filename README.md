@@ -98,7 +98,7 @@ $ db.getUsers()      ==> Database içindeki kullanıcıları bana versin
   ok: 1
 }
 
-$  db.adminCommand({listDatabases:1})    ==> Veritabanaların detaylı bilgilendirimesi içindeki
+$ db.adminCommand({listDatabases:1})    ==> Veritabanların detaylı bilgilendirimesi içindeki
 {
   databases: [
     { name: 'admin', sizeOnDisk: Long('135168'), empty: false },
@@ -108,6 +108,55 @@ $  db.adminCommand({listDatabases:1})    ==> Veritabanaların detaylı bilgilend
   ],
   totalSize: Long('335872'),
   totalSizeMb: Long('0'),
+  ok: 1
+}
+
+$  db.getRoles({showBuiltinRoles:true})  ==> Sunucudaki tüm veri tabanı rollerin listesini
+{
+  roles: [
+    {
+      role: 'read',
+      db: 'turkcell',
+      isBuiltin: true,
+      roles: [],
+      inheritedRoles: []
+    },
+    {
+      role: 'dbOwner',
+      db: 'turkcell',
+      isBuiltin: true,
+      roles: [],
+      inheritedRoles: []
+    },
+    {
+      role: 'readWrite',
+      db: 'turkcell',
+      isBuiltin: true,
+      roles: [],
+      inheritedRoles: []
+    },
+    {
+      role: 'dbAdmin',
+      db: 'turkcell',
+      isBuiltin: true,
+      roles: [],
+      inheritedRoles: []
+    },
+    {
+      role: 'userAdmin',
+      db: 'turkcell',
+      isBuiltin: true,
+      roles: [],
+      inheritedRoles: []
+    },
+    {
+      role: 'enableSharding',
+      db: 'turkcell',
+      isBuiltin: true,
+      roles: [],
+      inheritedRoles: []
+    }
+  ],
   ok: 1
 }
 ```
