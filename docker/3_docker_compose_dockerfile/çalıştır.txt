@@ -1,0 +1,34 @@
+Docker
+------------
+docker compose up -d
+docker compose ps
+docker compose logs -f mongodb2
+
+
+------------------
+docker exec -it mongodb2 mongosh --quiet --eval 'db.runCommand({ ping: 1 })'
+
+
+
+Bağlanma (host makineden)
+-----------
+mongosh "mongodb://root:rootpass@localhost:27019/admin"
+use appdb
+db.items.find()
+
+
+
+Yedek (standalone)
+-----------
+# container içine klasör bağla (geçici)
+docker exec -it mongodb2 mkdir -p /backup
+docker exec -it mongodb2 bash -lc 'mongodump --archive=/backup/appdb_$(date +%F).gz --gzip --db appdb'
+docker cp mongodb2:/backup ./backup
+
+
+
+
+Geri yükleme
+---------
+docker cp ./backup/appdb_2025-09-16.gz mongodb:/backup/
+docker exec -it mongodb bash -lc 'mongorestore --nsInclude=appdb.* --gzip --archive=/backup/appdb_2025-09-16.gz'

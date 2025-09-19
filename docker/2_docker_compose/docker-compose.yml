@@ -1,0 +1,49 @@
+# docker-compose up
+# docker-compose up -d
+# docker-compose ps
+# docker-compose down
+# docker exec -it turkcell_mongodb4 mongosh
+# mongosh "mongodb://hamit:123@localhost:27023/turkcell"
+
+version: "3.9"
+
+# Frontend,backend,database service
+services:
+  mongodb:
+    image: mongo:7
+    container_name: turkcell_mongodb4
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: hamit
+      MONGO_INITDB_ROOT_PASSWORD: 123
+      MONGO_INITDB_DATABASE: admin
+      TZ: Europe/Istanbul
+    ports:
+      - "27023:27017"
+    volumes:
+      - mongo-data:/data/db                       # kalıcı veri
+      - ./config/mongod.conf:/etc/mongo/mongod.conf:ro
+      - ./initdb:/docker-entrypoint-initdb.d:ro  # ilk kurulum scriptleri
+    command: ["--config", "/etc/mongo/mongod.conf"]
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' | grep -q 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mongo-net  # special network
+
+# persistent volume
+volumes:
+  mongo-data:
+
+# Custom network
+networks:
+  mongo-net:
+    driver: bridge
+
+

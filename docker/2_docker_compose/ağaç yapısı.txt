@@ -1,0 +1,7 @@
+mongo-standalone/
+├─ docker-compose.yml
+├─ initdb/
+│  ├─ 01-create-app-user.js
+│  └─ 02-seed-sample-data.js
+└─ config/
+   └─ mongod.conf

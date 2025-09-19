@@ -78,7 +78,7 @@ $ db.createUser({
 })
 
 $ db.getUsers()
-$ mongosh --username hamit --password 123 --authenticationDatabase turkcell
+$  mongosh "mongodb://hamit:123@localhost:27017/turkcell"
 
 ```
 

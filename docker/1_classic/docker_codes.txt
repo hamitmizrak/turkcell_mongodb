@@ -1,0 +1,20 @@
+$ docker run -d --name turkcell_mongodb1 \
+  -p 27020:27017 \
+  -v ./data:/data/db \
+  mongo:7
+
+$ docker exec -it mongodb1 mongosh
+*******************************************
+
+$ docker container run -d --name turkcell_mongodb2 -p 27021:27017 -v ./data:/data/db  mongo:7
+
+$ docker exec -it mongodb2 mongosh
+*******************************************
+
+$  docker container run -d --name turkcell_mongodb3 -p  27022:27017  \
+-e MONGO_INITDB_ROOT_USERNAME=hamit -e MONGO_INITDB_ROOT_PASSWORD=123456 \
+mongo:7
+
+docker exec -it turkcell_mongodb_data mongosh
+
+

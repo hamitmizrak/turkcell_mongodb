@@ -1,0 +1,46 @@
+# docker-compose up
+# docker-compose up -d
+# docker-compose ps
+# docker-compose down
+# docker exec -it turkcell_mongodb4 mongosh
+# mongosh "mongodb://hamit:123@localhost:27024/turkcell"
+
+
+version: "3.9"
+
+services:
+  mongodb2:
+    build: .   # Dockerfile 
+    image: my-mongo:7-custom
+    container_name: turkcell_mongodb5
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpass
+      MONGO_INITDB_DATABASE: admin
+      TZ: Europe/Istanbul
+    ports:
+      - "27024:27017"
+    volumes:
+      - mongo-data2:/data/db                       # kalıcı veri
+      - ./config/mongod.conf:/etc/mongo/mongod.conf:ro
+      - ./initdb:/docker-entrypoint-initdb.d:ro  # ilk kurulum scriptleri
+    command: ["--config", "/etc/mongo/mongod.conf"]
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' | grep -q 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mongo-net2
+
+volumes:
+  mongo-data2:
+
+networks:
+  mongo-net2:
+    driver: bridge
