@@ -1,0 +1,496 @@
+/** =========================================================================
+ *  BLOG ⇐ BLOGCATEGORY (dinamik id) — 
+ *  İçerikler:
+ *   - Koleksiyon şemaları (validator) + indexler (unique, text, yardımcı indexler)
+ *   - Kategori bul/oluştur (slug veya _id ile)
+ *   - Blog upsert (slug’a göre) — tüm alan tipleri: ObjectId, Decimal128, Long, Double, Regex, BinData, Date, Timestamp
+ *   - CRUD örnekleri (CREATE/READ/UPDATE/DELETE + SOFT DELETE/RESTORE)
+ *   - Arama, filtre, sıralama, sayfalama (skip/limit), $lookup ile join
+ *   - Emniyetli çalıştırma (try/catch), açık Türkçe açıklamalar
+ *
+ *  Nasıl kullanılır?
+ *   1) VS Code MongoDB Playground veya mongosh üzerinde bu dosyayı açın.
+ *   2) Aşağıdaki "DB_ADI" ve "CATEGORY_INPUT" / "BLOG_INPUT" kısımlarını ihtiyacınıza göre düzenleyin.
+ *   3) Dosyayı bölümler halinde seçip çalıştırabilir veya tamamını çalıştırabilirsiniz.
+ * ========================================================================= */
+
+/////////////////////////////
+// 0) Bağlanılacak DB
+/////////////////////////////
+const DB_ADI = 'turkcell'; // gerektiğinde değiştirin
+use(DB_ADI);
+
+/////////////////////////////
+// 1) Yardımcı Fonksiyonlar
+/////////////////////////////
+function toObjectIdMaybe(v) {
+  try {
+    return v && typeof v === 'string' ? new ObjectId(v) : v instanceof ObjectId ? v : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function tsNow() {
+  // Timestamp(seconds, increment) — mongod tarafında genelde server time kullanılır, client tahmini de iş görür
+  return Timestamp(Math.floor(Date.now() / 1000), 1);
+}
+
+function toBinDataOrNull(base64) {
+  if (!base64 || typeof base64 !== 'string' || !base64.trim()) return null;
+  // 0 = generic binary
+  return new BinData(0, base64.trim());
+}
+
+// Basit slug üreticisi (Türkçe karakterleri sadeleştirmek isterseniz genişletebilirsiniz)
+function toSlug(s) {
+  if (!s) return '';
+  return s
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/[^a-z0-9\-_\s]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/\-+/g, '-');
+}
+
+/////////////////////////////
+// 2) Koleksiyon Validatörleri (Şema) + Indexler
+/////////////////////////////
+
+// --- blogcategory ---
+const blogCategoryValidator = {
+  $jsonSchema: {
+    bsonType: 'object',
+    required: ['name', 'slug', 'isActive', 'createdAt', 'updatedAt'],
+    properties: {
+      name: { bsonType: 'string', description: 'Kategori adı' },
+      slug: { bsonType: 'string', description: 'Benzersiz, URL dostu' },
+      description: { bsonType: ['string', 'null'] },
+      isActive: { bsonType: 'bool' },
+      priority: { bsonType: ['int', 'long', 'double'], description: 'Sıralama önceliği' },
+      createdAt: { bsonType: 'date' },
+      updatedAt: { bsonType: 'timestamp' },
+    },
+    additionalProperties: true,
+  },
+};
+
+if (!db.getCollectionNames().includes('blogcategory')) {
+  db.createCollection('blogcategory', {
+    validator: blogCategoryValidator,
+    validationLevel: 'moderate',
+  });
+} else {
+  db.runCommand({
+    collMod: 'blogcategory',
+    validator: blogCategoryValidator,
+    validationLevel: 'moderate',
+  });
+}
+
+// Indexler
+db.blogcategory.createIndex({ slug: 1 }, { unique: true, name: 'ux_slug' });
+db.blogcategory.createIndex({ name: 1 }, { name: 'ix_name' });
+db.blogcategory.createIndex({ name: 'text', description: 'text' }, { name: 'tx_name_desc' });
+
+// --- blog ---
+const blogValidator = {
+  $jsonSchema: {
+    bsonType: 'object',
+    required: ['slug', 'title', 'content', 'categoryId', 'createdAt', 'updatedAt', 'isPublished'],
+    properties: {
+      slug: { bsonType: 'string' },
+      title: { bsonType: 'string' },
+      content: { bsonType: 'string' },
+      categoryId: { bsonType: 'objectId' },
+      tags: { bsonType: ['array'], items: { bsonType: 'string' } },
+      image: { bsonType: ['string', 'null'] },
+      likes: { bsonType: ['long', 'int'], description: 'NumberLong tercih edilir' },
+      rating: { bsonType: ['double', 'int', 'long'] },
+      revenue: { bsonType: 'decimal' }, // Decimal128
+      isPublished: { bsonType: 'bool' },
+      attachment: { bsonType: ['binData', 'null'] },
+      searchPattern: { bsonType: 'regex' },
+      author: {
+        bsonType: 'object',
+        required: ['name', 'id'],
+        properties: {
+          name: { bsonType: 'string' },
+          id: { bsonType: 'objectId' },
+        },
+      },
+      comments: {
+        bsonType: ['array'],
+        items: {
+          bsonType: 'object',
+          required: ['author', 'text', 'createdAt'],
+          properties: {
+            author: { bsonType: 'string' },
+            text: { bsonType: 'string' },
+            createdAt: { bsonType: 'date' },
+          },
+        },
+      },
+      createdAt: { bsonType: 'date' },
+      updatedAt: { bsonType: 'timestamp' },
+      deletedAt: { bsonType: ['date', 'null'] },
+    },
+    additionalProperties: true,
+  },
+};
+
+if (!db.getCollectionNames().includes('blog')) {
+  db.createCollection('blog', { validator: blogValidator, validationLevel: 'moderate' });
+} else {
+  db.runCommand({ collMod: 'blog', validator: blogValidator, validationLevel: 'moderate' });
+}
+
+// Indexler
+db.blog.createIndex({ slug: 1 }, { unique: true, name: 'ux_slug' });
+db.blog.createIndex({ categoryId: 1, createdAt: -1 }, { name: 'ix_category_createdAt' });
+db.blog.createIndex({ 'author.id': 1 }, { name: 'ix_authorId' });
+db.blog.createIndex(
+  { title: 'text', content: 'text', tags: 'text' },
+  { name: 'tx_title_content_tags', weights: { title: 5, content: 3, tags: 1 } }
+);
+db.blog.createIndex({ deletedAt: 1 }, { name: 'ix_deletedAt' }); // soft-delete sorgularında yardımcı
+
+/////////////////////////////
+// 3) Parametreler (DÜZENLEYİN)
+/////////////////////////////
+
+// Kategoriyi nasıl seçeceksiniz? mode: 'bySlug' | 'byId'
+const CATEGORY_INPUT = {
+  mode: 'bySlug',
+  slug: 'yapay-zeka',
+  // id: '66edb7b7e0c7b37c6f8f0001', // mode: 'byId' ise örnek
+  createIfNotExists: true, // bySlug modunda bulunamazsa otomatik oluşturulsun mu?
+  create: {
+    name: 'Yapay Zeka',
+    description: 'Yapay Zeka kategorisi',
+    isActive: true,
+    priority: 1,
+  },
+};
+
+// Oluşturulacak/Güncellenecek BLOG verileri
+const BLOG_INPUT = {
+  // slug benzersiz olacaktır; aynı slug ile çalıştırırsanız upsert davranır (günceller)
+  slug: 'deneme-yapay-zeka',
+  title: 'Deneme — Yapay Zeka Başlangıç',
+  content: 'Bu yazıda Yapay Zeka giriş konularını ele alıyoruz...',
+  tags: ['ai', 'ml', 'giriş'],
+  image: 'https://cdn.example.com/img/ai-basics.png',
+
+  // Sayısal alanlar
+  likes: 0, // NumberLong’a çevrilecek
+  rating: 4.5, // double
+  revenue: '1234.56', // Decimal128 (string verin)
+
+  // Yayın durumu
+  isPublished: true,
+
+  // Binary ek (opsiyonel): base64 verin; boş string ise null kaydedilir
+  attachmentBase64: '',
+
+  // Regex arama paterni (örnek)
+  searchPattern: 'yapay\\s*zeka', // i bayrağı ile case-insensitive ekleyeceğiz
+
+  // Yazar bilgisi
+  author: {
+    name: 'Hamit Mizrak',
+    id: null, // null ise otomatik ObjectId üretilecek
+  },
+
+  // Yorumlar
+  comments: [{ author: 'Ziyaretçi', text: 'Harika başlangıç yazısı!', createdAt: new Date() }],
+};
+
+/////////////////////////////
+// 4) Kategoriyi Bul/Oluştur
+/////////////////////////////
+let categoryDoc = null;
+
+if (CATEGORY_INPUT.mode === 'byId') {
+  const oid = toObjectIdMaybe(CATEGORY_INPUT.id);
+  if (!oid) throw new Error('Geçersiz CATEGORY_INPUT.id (ObjectId string bekleniyor)');
+  categoryDoc = db.blogcategory.findOne({ _id: oid });
+  if (!categoryDoc) throw new Error(`_id=${oid} kategorisi bulunamadı`);
+} else if (CATEGORY_INPUT.mode === 'bySlug') {
+  if (!CATEGORY_INPUT.slug) throw new Error('CATEGORY_INPUT.slug zorunludur (bySlug)');
+  const slugSafe = toSlug(CATEGORY_INPUT.slug);
+  categoryDoc = db.blogcategory.findOne({ slug: slugSafe });
+  if (!categoryDoc && CATEGORY_INPUT.createIfNotExists) {
+    const insertRes = db.blogcategory.insertOne({
+      name: CATEGORY_INPUT.create?.name ?? CATEGORY_INPUT.slug,
+      slug: slugSafe,
+      description: CATEGORY_INPUT.create?.description ?? '',
+      isActive: CATEGORY_INPUT.create?.isActive ?? true,
+      priority: CATEGORY_INPUT.create?.priority ?? 1,
+      createdAt: new Date(),
+      updatedAt: tsNow(),
+    });
+    categoryDoc = db.blogcategory.findOne({ _id: insertRes.insertedId });
+  }
+}
+
+if (!categoryDoc) throw new Error('Kategori bulunamadı (veya oluşturulamadı)');
+
+/////////////////////////////
+// 5) BLOG — CREATE/UPSERT (slug’a göre)
+/////////////////////////////
+const now = new Date();
+const authorId = BLOG_INPUT.author?.id
+  ? toObjectIdMaybe(BLOG_INPUT.author.id) ?? new ObjectId()
+  : new ObjectId();
+
+const blogDoc = {
+  slug: BLOG_INPUT.slug ? toSlug(BLOG_INPUT.slug) : '',
+  title: BLOG_INPUT.title ?? '',
+  content: BLOG_INPUT.content ?? '',
+  categoryId: categoryDoc._id, // DİNAMİK bağ
+  tags: Array.isArray(BLOG_INPUT.tags) ? BLOG_INPUT.tags : [],
+  image: BLOG_INPUT.image ?? null,
+  likes: NumberLong(BLOG_INPUT.likes ?? 0),
+  rating: typeof BLOG_INPUT.rating === 'number' ? BLOG_INPUT.rating : 0.0,
+  revenue: NumberDecimal(
+    typeof BLOG_INPUT.revenue === 'string'
+      ? BLOG_INPUT.revenue
+      : String(BLOG_INPUT.revenue ?? '0.00')
+  ),
+  isPublished: !!BLOG_INPUT.isPublished,
+  attachment: toBinDataOrNull(BLOG_INPUT.attachmentBase64),
+  searchPattern: new RegExp(BLOG_INPUT.searchPattern ?? '.*', 'i'),
+  author: {
+    name: BLOG_INPUT.author?.name ?? 'Anonim',
+    id: authorId,
+  },
+  comments: (Array.isArray(BLOG_INPUT.comments) ? BLOG_INPUT.comments : []).map((c) => ({
+    author: c.author ?? 'Anonim',
+    text: c.text ?? '',
+    createdAt: c.createdAt instanceof Date ? c.createdAt : now,
+  })),
+  createdAt: now,
+  updatedAt: tsNow(),
+  deletedAt: null,
+};
+
+// Upsert
+const upsertRes = db.blog.updateOne(
+  { slug: blogDoc.slug },
+  {
+    $setOnInsert: {
+      createdAt: blogDoc.createdAt,
+    },
+    $set: {
+      title: blogDoc.title,
+      content: blogDoc.content,
+      categoryId: blogDoc.categoryId,
+      tags: blogDoc.tags,
+      image: blogDoc.image,
+      likes: blogDoc.likes,
+      rating: blogDoc.rating,
+      revenue: blogDoc.revenue,
+      isPublished: blogDoc.isPublished,
+      attachment: blogDoc.attachment,
+      searchPattern: blogDoc.searchPattern,
+      author: blogDoc.author,
+      comments: blogDoc.comments,
+      updatedAt: blogDoc.updatedAt,
+      deletedAt: blogDoc.deletedAt,
+    },
+  },
+  { upsert: true }
+);
+
+print('Upsert sonucu:', JSON.stringify(upsertRes));
+
+/////////////////////////////
+// 6) CRUD ÖRNEKLERİ
+/////////////////////////////
+
+// --- READ (tekil) — slug ile ve kategori join’li ---
+const withCategory = db.blog
+  .aggregate([
+    { $match: { slug: blogDoc.slug, deletedAt: null } },
+    {
+      $lookup: {
+        from: 'blogcategory',
+        localField: 'categoryId',
+        foreignField: '_id',
+        as: 'category',
+      },
+    },
+    { $unwind: '$category' },
+    {
+      $project: {
+        _id: 1,
+        slug: 1,
+        title: 1,
+        content: 1,
+        tags: 1,
+        image: 1,
+        likes: 1,
+        rating: 1,
+        revenue: 1,
+        isPublished: 1,
+        author: 1,
+        comments: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        deletedAt: 1,
+        category: { _id: 1, name: '$category.name', slug: '$category.slug' },
+      },
+    },
+    { $limit: 1 },
+  ])
+  .toArray();
+
+print('READ (with $lookup) =>');
+printjson(withCategory[0] ?? null);
+
+// --- READ (arama/sıralama/sayfalama) ---
+const PAGE = 1,
+  LIMIT = 10;
+const SKIP = (PAGE - 1) * LIMIT;
+
+const filter = {
+  deletedAt: null,
+  $text: { $search: 'yapay zeka' }, // text indexi ile
+  // Alternatif: title regex
+  // title: { $regex: /yapay\s*zeka/i }
+};
+
+const totalCount = db.blog.countDocuments(filter);
+const pageDocs = db.blog
+  .find(filter)
+  .sort({ score: { $meta: 'textScore' }, createdAt: -1 })
+  .skip(SKIP)
+  .limit(LIMIT)
+  .toArray();
+
+print(`PAGE=${PAGE}, LIMIT=${LIMIT}, TOTAL=${totalCount}`);
+printjson(pageDocs.map((d) => ({ slug: d.slug, title: d.title, createdAt: d.createdAt })));
+
+// --- UPDATE (örnek): beğeni artır, başlık güncelle ---
+const upd = db.blog.findOneAndUpdate(
+  { slug: blogDoc.slug, deletedAt: null },
+  {
+    $inc: { likes: NumberLong(1) },
+    $set: { title: blogDoc.title + ' (Güncellendi)', updatedAt: tsNow() },
+  },
+  { returnDocument: 'after' }
+);
+
+print('UPDATE =>');
+printjson(upd.value);
+
+// --- DELETE (SOFT) ---
+const softDel = db.blog.updateOne(
+  { slug: blogDoc.slug, deletedAt: null },
+  { $set: { deletedAt: new Date(), isPublished: false, updatedAt: tsNow() } }
+);
+print('SOFT DELETE =>', JSON.stringify(softDel));
+
+// --- RESTORE (SOFT DELETE geri al) ---
+const restore = db.blog.updateOne(
+  { slug: blogDoc.slug, deletedAt: { $ne: null } },
+  { $set: { deletedAt: null, updatedAt: tsNow() } }
+);
+print('RESTORE =>', JSON.stringify(restore));
+
+// --- DELETE (HARD) — kalıcı silme ---
+// DİKKAT: Gerçek silme yapar!
+/*
+const hardDel = db.blog.deleteOne({ slug: blogDoc.slug });
+print('HARD DELETE =>', JSON.stringify(hardDel));
+*/
+
+/////////////////////////////
+// 7) Kategori CRUD kısa örnekleri
+/////////////////////////////
+
+// CREATE
+const catSlug = toSlug('veri-bilimi');
+db.blogcategory.updateOne(
+  { slug: catSlug },
+  {
+    $setOnInsert: { createdAt: new Date() },
+    $set: {
+      name: 'Veri Bilimi',
+      slug: catSlug,
+      description: 'Veri Bilimi yazıları',
+      isActive: true,
+      priority: 2,
+      updatedAt: tsNow(),
+    },
+  },
+  { upsert: true }
+);
+
+// READ
+const cat = db.blogcategory.findOne({ slug: catSlug });
+print('Kategori READ =>');
+printjson(cat);
+
+// UPDATE
+db.blogcategory.updateOne(
+  { _id: cat._id },
+  { $set: { name: 'Veri Bilimi (Güncel)', updatedAt: tsNow() } }
+);
+
+// DELETE (hard — örnek)
+/*
+db.blogcategory.deleteOne({ _id: cat._id });
+*/
+
+/////////////////////////////
+// 8) Raporlama/Aggregation örneği
+/////////////////////////////
+const byCategoryReport = db.blog
+  .aggregate([
+    { $match: { deletedAt: null } },
+    {
+      $group: {
+        _id: '$categoryId',
+        totalBlogs: { $sum: 1 },
+        totalLikes: { $sum: '$likes' },
+        avgRating: { $avg: '$rating' },
+      },
+    },
+    { $lookup: { from: 'blogcategory', localField: '_id', foreignField: '_id', as: 'cat' } },
+    { $unwind: '$cat' },
+    {
+      $project: {
+        _id: 0,
+        categoryId: '$_id',
+        category: '$cat.name',
+        totalBlogs: 1,
+        totalLikes: 1,
+        avgRating: 1,
+      },
+    },
+    { $sort: { totalBlogs: -1 } },
+  ])
+  .toArray();
+
+print('Kategori Bazlı Özet =>');
+printjson(byCategoryReport);
+
+/////////////////////////////
+// 9) Örnek Hata Yakalama (validator tetiklemek için)
+/////////////////////////////
+try {
+  db.blog.insertOne({ title: 'Eksik alanlarla kayıt — başarısız olmalı' });
+} catch (e) {
+  print('Beklenen hata (validator devrede):', e.message);
+}
+
+print('--- TAMAMLANDI ---');

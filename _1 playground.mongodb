@@ -1,0 +1,231 @@
+/** =========================================================================
+ *  BLOG  ⇐  BLOGCATEGORY (dinamik id) – Eksiksiz Ekleme/Upsert (Final)
+ *  - Kategori: slug veya _id ile bulunur; yoksa oluşturulur.
+ *  - Blog: slug'a göre upsert; tüm alanlar doldurulur.
+ *  - Gerekli index’ler createIndex ile garanti edilir.
+ *  - Mongosh / VS Code Playground uyumludur.
+ * ========================================================================= */
+
+/////////////////////////////
+// 0) Bağlanılacak DB
+/////////////////////////////
+use('turkcell'); // gerekiyorsa değiştirin
+
+/////////////////////////////
+// 1) Parametreler (DÜZENLEYİN)
+/////////////////////////////
+
+// Kategoriyi nasıl seçeceksiniz?
+// mode: 'bySlug' | 'byId'
+const CATEGORY_INPUT = {
+  mode: 'bySlug', // 'byId' yaparsanız aşağıda 'id' alanını kullanır
+  slug: 'yapay-zeka', // mode: bySlug için
+  // id: '66edb7b7e0c7b37c6f8f0001', // mode: byId için (örnek ObjectId string)
+  createIfNotExists: true, // slug ile aramada bulunamazsa kategori oluştursun mu?
+  create: {
+    name: 'Yapay Zeka', // yoksa oluştururken kullanılacak alanlar
+    description: 'Yapay Zeka kategorisi',
+    isActive: true,
+    priority: 1,
+  },
+};
+
+// Oluşturulacak/Güncellenecek BLOG verileri
+const BLOG_INPUT = {
+  // slug benzersiz olacaktır; aynı slug ile yeniden çalıştırırsanız upsert davranır (günceller)
+  slug: 'deneme-yapay-zeka',
+
+  title: 'Deneme — Yapay Zeka Başlangıç',
+  content: 'Bu yazıda Yapay Zeka giriş konularını ele alıyoruz...',
+  tags: ['ai', 'ml', 'basics'],
+  image: 'https://cdn.example.com/img/ai-basics.png',
+
+  // Sayısal alanlar
+  likes: 0, // NumberLong’a çevrilecek
+  rating: 4.5, // double
+  revenue: '1234.56', // Decimal128 (string olarak verin)
+
+  // Yayın durumu
+  isPublished: true,
+
+  // Binary ek (opsiyonel): base64 verin; örnek olması için boş string bırakabilirsiniz
+  attachmentBase64: '', // '' = boş; dolu verirseniz BinData(0, base64) olarak kaydedilir
+
+  // Regex arama paterni (örnek)
+  searchPattern: 'yapay\\s*zeka', // i bayrağı ile case-insensitive
+
+  // Yazar bilgisi
+  author: {
+    name: 'Hamit Mizrak',
+    id: null, // null bırakırsanız otomatik ObjectId üretilecek
+  },
+
+  // Yorumlar
+  comments: [
+    {
+      author: 'Ziyaretçi',
+      text: 'Harika başlangıç yazısı!',
+      createdAt: new Date(),
+    },
+  ],
+};
+
+/////////////////////////////
+// 2) Yardımcılar
+/////////////////////////////
+
+function toObjectIdMaybe(idStr) {
+  try {
+    return new ObjectId(idStr);
+  } catch (e) {
+    return null;
+  }
+}
+
+// BSON Timestamp: (epochSeconds, increment)
+// updatedAt için parametresiz Timestamp() KULLANMAYIN — iki argüman ister.
+function tsNow() {
+  const epochSeconds = Math.floor(Date.now() / 1000);
+  return new Timestamp(epochSeconds, 1);
+}
+
+// BinData üret (base64 string gelirse)
+function toBinDataOrNull(b64) {
+  if (!b64 || typeof b64 !== 'string' || b64.length === 0) return null;
+  return new BinData(0, b64); // subtype 0: generic
+}
+
+/////////////////////////////
+// 3) Index’leri garantiye al
+/////////////////////////////
+
+// BLOG
+db.blog.createIndex({ slug: 1 }, { unique: true });
+db.blog.createIndex({ categoryId: 1, createdAt: -1 });
+db.blog.createIndex({ isPublished: 1, createdAt: -1 });
+db.blog.createIndex({ tags: 1 });
+db.blog.createIndex({ title: 'text', content: 'text' }, { default_language: 'turkish' });
+
+// BLOGCATEGORY
+db.blogcategory.createIndex({ slug: 1 }, { unique: true });
+db.blogcategory.createIndex(
+  { name: 1 },
+  { unique: true, collation: { locale: 'tr', strength: 2 } }
+);
+db.blogcategory.createIndex({ parentCategory: 1, priority: 1 });
+
+/////////////////////////////
+// 4) Kategoriyi çöz (bul/oluştur)
+/////////////////////////////
+
+let categoryDoc = null;
+
+if (CATEGORY_INPUT.mode === 'byId') {
+  const oid = toObjectIdMaybe(CATEGORY_INPUT.id);
+  if (!oid) {
+    throw new Error('Geçersiz CATEGORY_INPUT.id (ObjectId string bekleniyor)');
+  }
+  categoryDoc = db.blogcategory.findOne({ _id: oid });
+  if (!categoryDoc) {
+    throw new Error(`_id=${oid} kategorisi bulunamadı`);
+  }
+} else if (CATEGORY_INPUT.mode === 'bySlug') {
+  if (!CATEGORY_INPUT.slug) throw new Error('CATEGORY_INPUT.slug zorunludur (bySlug modunda)');
+  categoryDoc = db.blogcategory.findOne({ slug: CATEGORY_INPUT.slug });
+  if (!categoryDoc && CATEGORY_INPUT.createIfNotExists) {
+    // slug üretimi (basit)
+    const slugSafe = CATEGORY_INPUT.slug.toString().trim().toLowerCase();
+    const insertRes = db.blogcategory.insertOne({
+      name: CATEGORY_INPUT.create?.name ?? CATEGORY_INPUT.slug,
+      slug: slugSafe,
+      description: CATEGORY_INPUT.create?.description ?? '',
+      isActive: CATEGORY_INPUT.create?.isActive ?? true,
+      priority: CATEGORY_INPUT.create?.priority ?? 1,
+      createdAt: new Date(),
+      updatedAt: tsNow(),
+    });
+    categoryDoc = db.blogcategory.findOne({ _id: insertRes.insertedId });
+  }
+  if (!categoryDoc) {
+    throw new Error(
+      `slug=${CATEGORY_INPUT.slug} kategorisi bulunamadı (ve createIfNotExists=false)`
+    );
+  }
+} else {
+  throw new Error("CATEGORY_INPUT.mode 'bySlug' veya 'byId' olmalı");
+}
+
+/////////////////////////////
+// 5) Blog belgesini inşa et
+/////////////////////////////
+
+const now = new Date();
+const blogAuthorId = BLOG_INPUT.author?.id
+  ? toObjectIdMaybe(BLOG_INPUT.author.id) ?? new ObjectId()
+  : new ObjectId();
+
+const blogDoc = {
+  title: BLOG_INPUT.title,
+  content: BLOG_INPUT.content,
+  slug: BLOG_INPUT.slug,
+  categoryId: categoryDoc._id, // <<< DİNAMİK: blogcategory’den gelen _id
+  tags: Array.isArray(BLOG_INPUT.tags) ? BLOG_INPUT.tags : [],
+  image: BLOG_INPUT.image ?? null,
+
+  likes: NumberLong(BLOG_INPUT.likes ?? 0), // long
+  rating: typeof BLOG_INPUT.rating === 'number' ? BLOG_INPUT.rating : 0.0, // double
+  revenue: NumberDecimal(
+    typeof BLOG_INPUT.revenue === 'string'
+      ? BLOG_INPUT.revenue
+      : String(BLOG_INPUT.revenue ?? '0.00')
+  ), // decimal128
+
+  isPublished: !!BLOG_INPUT.isPublished, // bool
+  attachment: toBinDataOrNull(BLOG_INPUT.attachmentBase64), // binData veya null
+  searchPattern: new RegExp(BLOG_INPUT.searchPattern ?? '.*', 'i'), // regex
+
+  author: {
+    name: BLOG_INPUT.author?.name ?? 'Anonim',
+    id: blogAuthorId, // objectId
+  },
+
+  comments: (Array.isArray(BLOG_INPUT.comments) ? BLOG_INPUT.comments : []).map((c) => ({
+    author: c.author ?? 'Anonim',
+    text: c.text ?? '',
+    createdAt: c.createdAt instanceof Date ? c.createdAt : now,
+  })),
+
+  createdAt: now, // date
+  updatedAt: tsNow(), // timestamp
+  deletedAt: null, // null (soft-delete için)
+};
+
+/////////////////////////////
+// 6) Upsert: slug benzersiz – varsa güncelle, yoksa ekle
+/////////////////////////////
+
+const upsertRes = db.blog.updateOne(
+  { slug: blogDoc.slug }, // slug kriteri
+  {
+    $setOnInsert: { createdAt: blogDoc.createdAt },
+    $set: {
+      title: blogDoc.title,
+      content: blogDoc.content,
+      categoryId: blogDoc.categoryId,
+      tags: blogDoc.tags,
+      image: blogDoc.image,
+      likes: blogDoc.likes,
+      rating: blogDoc.rating,
+      revenue: blogDoc.revenue,
+      isPublished: blogDoc.isPublished,
+      attachment: blogDoc.attachment,
+      searchPattern: blogDoc.searchPattern,
+      author: blogDoc.author,
+      comments: blogDoc.comments,
+      updatedAt: blogDoc.updatedAt,
+      deletedAt: blogDoc.deletedAt,
+    },
+  },
+  { upsert: true }
+);
+

@@ -3,7 +3,7 @@
 # docker-compose ps
 # docker-compose down
 # docker exec -it turkcell_mongodb4 mongosh
-# mongosh "mongodb://hamit:123@localhost:27023/turkcell"
+# mongosh "mongodb://hamit:123@localhost:27017/turkcell"
 
 version: "3.9"
 

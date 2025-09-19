@@ -1,0 +1,7 @@
+1-) Extensions ==> MongoDB for Vs Code 
+
+2-) Sol çubuktaki yaprak(Mongo) ==> Connect ==>
+$ mongosh "mongodb://hamit:123@localhost:27017/turkcell"
+
+connect ==> mongodb://hamit:123@localhost:27017/turkcell
+
