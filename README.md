@@ -63,7 +63,6 @@ $ db.getCollectionInfos()  ==> Veritabanındaki tüm koleksiyonların isim ve ti
 $ db.getSiblingDB("admin").system.users.find().pretty();  ==>  Tüm veri tabanlarındaki tüm kullancııların liste(admin yetkisi ver)
 
 ```
-
 ---
 
 ## Database oluştur, Tüm Yetkilendirme
@@ -105,6 +104,29 @@ mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&a
 $ db.serverStatus()       ==> Sunucunu genel durumu, memory,disk, ve bir çok istatistiği
 $ db.getCollectionInfos()  ==> Veritabanındaki tüm koleksiyonların isim ve tip bilgisin dönder
 $ db.getSiblingDB("admin").system.users.find().pretty();  ==>  Tüm veri tabanlarındaki tüm kullancııların liste(admin yetkisi ver)
+$ db.runCommand({ komutAdi: parametre })  ==> Her türlü özel/ileri seviye veritabanı komutunu manuel çalıştırmanı sağlar.
+db.runCommand({ dbStats: 1 })  ==> Veritabanı hakkında istatistik almak
+db.runCommand({ listIndexes: "blog" })  ==> Koleksiyonun indexlerini görmek
+db.runCommand({ connectionStatus: 1 }) ==> Mevcut bağlantıdaki kullanıcıyı görmek
+db.adminCommand({ listDatabases: 1 })   ==> Bütün veritabanlarını detaylı listelemek
+db.runCommand({ buildInfo: 1 })  ==> MongoDB versiyonunu öğrenmek
+
+$ db.getCollectionNames().forEach(function(coll){
+  printjson(db.getCollection(coll).stats())
+})    ==>  Aktif veritabanında tüm koleksiyonların boyutlarını, belge sayılarını detaylı gör
+
+$ db.getSiblingDB("admin").system.users.find().pretty() ==> Sunucudaki tüm kullanıcıları ve rollerini detaylıca listeler.
+
+$ db.adminCommand("listDatabases").databases.map(x => x.name)  ==>  Basit dizi olarak sadece isimleri döndürür.
+$ db.runCommand({ connectionStatus: 1 }) ==> Şu anki bağlantıdaki kullanıcı ve rollerini gösterir.
+$ db.isMaster()   ==> Bir veritabanının readonly olup olmadığını (salt okunur mod) kontrol et
+$ db.system.indexes.find().pretty() ==> Tüm indexlerin dökümünü verir.
+$ db.getCollectionInfos().forEach(function(ci){
+  print(ci.name + " - type: " + ci.type + ", options: " + JSON.stringify(ci.options))
+})  ==> Koleksiyon tiplerini, özel ayarlarını, capped olup olmadığını vs. listeler.
+$ rs.status()  ==> Sadece replica set kuruluysa, hangi node primary/secondary gibi bilgileri verir.
+
+$ db.serverCmdLineOpts().parsed.systemLog  ==> MongoDB'nin kullandığı log dosyasının tam yolunu gösterir.
 ```
 
 ---
@@ -119,6 +141,46 @@ $ db.createCollection("blog")
 $ show collections            ==> Bütün tabloları listelesin
 $ db.getCollectionNames()     ==> Koleksiyonların isimlerini bir dizi olarak ver
 $ db.blog.drop()              ==> Koleksiyonlar silmek
+$ db.getCollectionNames().forEach(function(c) { db[c].drop(); }) ==> Sadece blog ve blogcategory koleksiyonlarını topluca siler.
+
+$ db.koleksiyon_adi.find()  ==> Koleksiyon içindeki tüm dokümanları (verileri) listeler.
+$ db.koleksiyon_adi.find().limit(10) ==> Koleksiyondaki ilk 10 dokümanı listeler.
+$ db.koleksiyon_adi.find().sort({ alan: 1 })    // Artan (ASC) Koleksiyonda Belirli Alanlara Göre Sıralama
+$ db.koleksiyon_adi.find().sort({ alan: -1 })    // Artan (DESC) Koleksiyonda Belirli Alanlara Göre Sıralama
+$ db.koleksiyon_adi.find().sort({ _id: -1 }).limit(5) ==> Son eklenen 5 kaydı listeler.
+$ db.koleksiyon_adi.find({ alan: "deger" }).explain("executionStats")  ==> Sorgunun nasıl çalıştığı, kaç kayıt tarandığı, index kullanımı vb. analiz edilir.
+
+$ db.koleksiyon_adi.distinct("alan")  ==> Belirli bir alanın tekrar etmeyen (unique) değerlerini döndürür.
+
+$ db.koleksiyon_adi.insertOne({ alan: "deger" })  ==> Koleksiyona tek bir doküman ekler.
+$ db.koleksiyon_adi.insertMany([{ alan: "deger1" }, { alan: "deger2" }])  ==> Koleksiyona birden fazla doküman ekler.
+$ db.koleksiyon_adi.deleteOne({ alan: "deger" })  ==> Eşleşen ilk dokümanı siler.
+$ db.koleksiyon_adi.deleteMany({ alan: "deger" })  ==> Eşleşen tüm dokümanları siler.
+
+$ db.koleksiyon_adi.updateOne(
+  { alan: "deger" },
+  { $set: { alan: "yeni_deger" } }
+)   ==>  Koleksiyon Verilerini Güncelle
+
+
+$ db.koleksiyon_adi.updateMany(
+  { alan: "deger" },
+  { $set: { alan: "yeni_deger" } }
+)  ==> Eşleşen tüm dokümanları günceller.
+
+
+$ db.koleksiyon_adi.stats()  ==> Koleksiyonun Detaylı İstatistiklerini Gör
+$ db.koleksiyon_adi.getIndexes() ==>  Koleksiyon üzerindeki tüm indexleri (ve primary key'i) listeler.
+$ db.getCollectionNames().includes("koleksiyon_adi") ==> Koleksiyonun var olup olmadığını kontrol eder (Boolean döner).
+$ db.koleksiyon_adi.countDocuments()  ==>  Koleksiyon içindeki toplam belge (kayıt) sayısını verir.
+$ db.getCollectionInfos({ name: "koleksiyon_adi" }) ==> Bir Koleksiyonun Tipini ve Ayarlarını Görmek
+
+
+$ db.koleksiyon_adi.aggregate([
+  { $project: { arrayofkeyvalue: { $objectToArray: "$$ROOT" } } },
+  { $unwind: "$arrayofkeyvalue" },
+  { $group: { _id: null, fields: { $addToSet: "$arrayofkeyvalue.k" } } }
+])  ==> Tüm farklı alan isimlerini bulur.
 
 
 ```
